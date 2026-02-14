@@ -63,8 +63,5 @@ import time as t
 while True:
     try:
         bot.run(TOKEN)
-    except Exception as e:
-        print("Bot crashed, restarting in 5 seconds...", e)
-        t.sleep(5)
 
 
