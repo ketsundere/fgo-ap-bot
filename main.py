@@ -4,20 +4,21 @@ import discord
 from discord import app_commands
 from discord.ext import tasks
 
-TOKEN = os.getenv("TOKEN")  # Make sure you added this in Railway Secrets
+# Environment variable for your bot token
+TOKEN = os.getenv("TOKEN")
 
 class APBot(discord.Client):
     def __init__(self):
-        super().__init__(intents=discord.Intents.default())
+        intents = discord.Intents.default()
+        super().__init__(intents=intents)
         self.tree = app_commands.CommandTree(self)
-        self.timers = {}  # Stores timers: {user_id: (timestamp, channel)}
+        self.timers = {}  # Store timers: {user_id: (end_timestamp, channel)}
         self.check_timers.start()  # Start background task
 
     async def setup_hook(self):
         await self.tree.sync()
         print("Slash commands synced.")
 
-    # Background task to check timers every minute
     @tasks.loop(seconds=60)
     async def check_timers(self):
         now = time.time()
@@ -31,7 +32,6 @@ class APBot(discord.Client):
 
 bot = APBot()
 
-# Helper function to calculate AP time
 def calculate_timer(value: int):
     if value < 0 or value > 140:
         return None, "Value must be between 0–140"
@@ -54,14 +54,9 @@ def calculate_timer(value: int):
 async def ap(interaction: discord.Interaction, value: int):
     timestamp, msg = calculate_timer(value)
     if timestamp:
-        # Store timer with channel reference
+        # Save the timer for this user in the channel where command was run
         bot.timers[interaction.user.id] = (timestamp, interaction.channel)
     await interaction.response.send_message(msg)
 
-# Optional auto-restart if bot crashes
-import time as t
-while True:
-    try:
-        bot.run(TOKEN)
-
-
+# Run the bot
+bot.run(TOKEN)
