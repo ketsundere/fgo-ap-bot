@@ -3,14 +3,18 @@ import time
 import discord
 from discord import app_commands
 from discord.ext import tasks
+from flask import Flask
+from threading import Thread
 
-# Your bot token
+# ---------------------
+# Discord Bot Setup
+# ---------------------
 TOKEN = os.getenv("TOKEN")
 
-# Replace with your server (guild) ID for instant command registration
-GUILD_ID = 123456789012345678  # <-- put your Discord server ID here
+# Replace with your Discord server (guild) ID for instant slash command registration
+GUILD_ID = 123456789012345678  # <-- put your server ID here
 
-intents = discord.Intents.default()  # Default intents are enough for slash commands
+intents = discord.Intents.default()
 
 class APBot(discord.Client):
     def __init__(self):
@@ -20,7 +24,7 @@ class APBot(discord.Client):
         self.bg_task_started = False
 
     async def setup_hook(self):
-        # Sync commands to a specific guild for instant registration
+        # Sync commands to a single guild for instant availability
         guild = discord.Object(id=GUILD_ID)
         await self.tree.sync(guild=guild)
         print(f"Slash commands synced to guild {GUILD_ID}")
@@ -45,7 +49,9 @@ class APBot(discord.Client):
 
 bot = APBot()
 
-# Helper to calculate AP time
+# ---------------------
+# AP Calculation Helper
+# ---------------------
 def calculate_timer(value: int):
     if value < 0 or value > 140:
         return None, "Value must be between 0–140"
@@ -62,7 +68,9 @@ def calculate_timer(value: int):
         f"You will be maxed at: <t:{timestamp}:F>"
     )
 
-# Slash command
+# ---------------------
+# Slash Command
+# ---------------------
 @bot.tree.command(name="ap", description="Calculate time until 140 based on AP")
 @app_commands.describe(value="AP value between 0–140")
 async def ap(interaction: discord.Interaction, value: int):
@@ -72,4 +80,21 @@ async def ap(interaction: discord.Interaction, value: int):
         bot.timers[interaction.user.id] = (timestamp, interaction.channel)
     await interaction.response.send_message(msg)
 
+# ---------------------
+# Flask Ping Endpoint
+# ---------------------
+app = Flask("")
+
+@app.route("/")
+def home():
+    return "Bot is running!"
+
+def run_flask():
+    app.run(host="0.0.0.0", port=8080)
+
+Thread(target=run_flask).start()
+
+# ---------------------
+# Run Bot
+# ---------------------
 bot.run(TOKEN)
