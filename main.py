@@ -4,20 +4,27 @@ import discord
 from discord import app_commands
 from discord.ext import tasks
 
-# Environment variable for your bot token
 TOKEN = os.getenv("TOKEN")
+
+intents = discord.Intents.default()
+intents.message_content = True  # Needed to send messages in channels
 
 class APBot(discord.Client):
     def __init__(self):
-        intents = discord.Intents.default()
         super().__init__(intents=intents)
         self.tree = app_commands.CommandTree(self)
-        self.timers = {}  # Store timers: {user_id: (end_timestamp, channel)}
-        self.check_timers.start()  # Start background task
+        self.timers = {}  # {user_id: (end_timestamp, channel)}
+        self.bg_task_started = False  # prevent starting before ready
 
     async def setup_hook(self):
         await self.tree.sync()
         print("Slash commands synced.")
+
+    async def on_ready(self):
+        print(f"Logged in as {self.user}")
+        if not self.bg_task_started:
+            self.check_timers.start()
+            self.bg_task_started = True
 
     @tasks.loop(seconds=60)
     async def check_timers(self):
@@ -25,7 +32,8 @@ class APBot(discord.Client):
         to_remove = []
         for user_id, (end_timestamp, channel) in self.timers.items():
             if now >= end_timestamp:
-                await channel.send(f"<@{user_id}> Your AP is now full!")
+                if channel:  # make sure channel exists
+                    await channel.send(f"<@{user_id}> Your AP is now full!")
                 to_remove.append(user_id)
         for user_id in to_remove:
             del self.timers[user_id]
@@ -48,15 +56,13 @@ def calculate_timer(value: int):
         f"You will be maxed at: <t:{timestamp}:F>"
     )
 
-# Slash command
 @bot.tree.command(name="ap", description="Calculate time until 140 based on AP")
 @app_commands.describe(value="AP value between 0–140")
 async def ap(interaction: discord.Interaction, value: int):
     timestamp, msg = calculate_timer(value)
     if timestamp:
-        # Save the timer for this user in the channel where command was run
+        # Save timer with the channel where command was run
         bot.timers[interaction.user.id] = (timestamp, interaction.channel)
     await interaction.response.send_message(msg)
 
-# Run the bot
 bot.run(TOKEN)
