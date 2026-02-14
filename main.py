@@ -9,8 +9,11 @@ from discord.ext import tasks
 # ---------------------
 TOKEN = os.getenv("TOKEN")
 GUILD_ID = 1472244399416021023  # <-- replace with your Discord server ID
+CARL_BOT_ID = 235148962103951360  # Carl Bot's user ID, replace if different
 
 intents = discord.Intents.default()
+intents.messages = True
+intents.dm_messages = True
 
 # ---------------------
 # Bot Class
@@ -19,7 +22,8 @@ class APBot(discord.Client):
     def __init__(self):
         super().__init__(intents=intents)
         self.tree = app_commands.CommandTree(self)
-        self.timers = {}  # {user_id: (end_timestamp, channel)}
+        self.timers = {}  # {user_id: (end_timestamp, channel, total_minutes)}
+        self.pending_channel = {}  # {user_id: channel}
         self.bg_task_started = False
 
     async def setup_hook(self):
@@ -29,21 +33,16 @@ class APBot(discord.Client):
 
     async def on_ready(self):
         print(f"Logged in as {self.user}")
-        if not self.bg_task_started:
-            self.check_timers.start()
-            self.bg_task_started = True
 
-    @tasks.loop(seconds=60)
-    async def check_timers(self):
-        now = time.time()
-        to_remove = []
-        for user_id, (end_timestamp, channel) in self.timers.items():
-            if now >= end_timestamp:
-                if channel:
-                    await channel.send(f"<@{user_id}> Your AP is now full!")
-                to_remove.append(user_id)
-        for user_id in to_remove:
-            del self.timers[user_id]
+    async def on_message(self, message):
+        # Triggered when bot receives a DM
+        if isinstance(message.channel, discord.DMChannel):
+            if message.author.id == CARL_BOT_ID:
+                # Attempt to parse user ID from message
+                # For simplicity, ping all stored pending channels
+                for user_id, channel in self.pending_channel.items():
+                    await channel.send(f"<@{user_id}> Your AP is now full! @everyone")
+                self.pending_channel.clear()
 
 # ---------------------
 # Bot Instance
@@ -55,7 +54,7 @@ bot = APBot()
 # ---------------------
 def calculate_timer(value: int):
     if value < 0 or value > 140:
-        return None, "Value must be between 0–140"
+        return None, None, "Value must be between 0–140"
 
     remaining = 140 - value
     total_minutes = remaining * 5
@@ -63,11 +62,13 @@ def calculate_timer(value: int):
     minutes = total_minutes % 60
     timestamp = int(time.time()) + (total_minutes * 60)
 
-    return timestamp, (
+    msg = (
         f"Remaining to 140: **{remaining}**\n"
         f"Total time: **{hours}h {minutes}m**\n"
         f"You will be maxed at: <t:{timestamp}:F>"
     )
+
+    return timestamp, total_minutes, msg
 
 # ---------------------
 # Slash Command: /AP
@@ -75,10 +76,14 @@ def calculate_timer(value: int):
 @bot.tree.command(name="ap", description="Calculate time until 140 based on AP")
 @app_commands.describe(value="AP value between 0–140")
 async def ap(interaction: discord.Interaction, value: int):
-    print(f"Command received: {interaction.user} -> {value}")
-    timestamp, msg = calculate_timer(value)
+    timestamp, total_minutes, msg = calculate_timer(value)
     if timestamp:
-        bot.timers[interaction.user.id] = (timestamp, interaction.channel)
+        # Store for later channel ping
+        bot.pending_channel[interaction.user.id] = interaction.channel
+
+        # Send Carl Bot reminder to DM the bot later
+        await interaction.channel.send(f"!remindme {total_minutes}m Your AP is full!")
+
     await interaction.response.send_message(msg)
 
 # ---------------------
