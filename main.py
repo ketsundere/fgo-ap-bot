@@ -8,7 +8,7 @@ from discord.ext import tasks
 # Config
 # ---------------------
 TOKEN = os.getenv("TOKEN")
-GUILD_ID = 123456789012345678  # <-- replace with your Discord server ID
+GUILD_ID = 1472244399416021023  # <-- replace with your Discord server ID
 
 intents = discord.Intents.default()
 
