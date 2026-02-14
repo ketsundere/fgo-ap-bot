@@ -8,7 +8,7 @@ from discord.ext import tasks
 # Config
 # ---------------------
 TOKEN = os.getenv("TOKEN")
-GUILD_ID = 1472244399416021023  # <-- replace with your Discord server ID
+GUILD_ID = 123456789012345678  # <-- replace with your Discord server ID
 
 intents = discord.Intents.default()
 
@@ -80,23 +80,8 @@ async def ap(interaction: discord.Interaction, value: int):
     if timestamp:
         bot.timers[interaction.user.id] = (timestamp, interaction.channel)
     await interaction.response.send_message(msg)
-    
-from flask import Flask
-from threading import Thread
-
-app = Flask("")
-
-@app.route("/")
-def home():
-    return "Bot is running!"
-
-def run_flask():
-    app.run(host="0.0.0.0", port=8080)
-
-Thread(target=run_flask).start()
 
 # ---------------------
 # Run the bot
 # ---------------------
 bot.run(TOKEN)
-
