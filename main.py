@@ -4,21 +4,26 @@ import discord
 from discord import app_commands
 from discord.ext import tasks
 
+# Your bot token
 TOKEN = os.getenv("TOKEN")
 
-intents = discord.Intents.default()
-intents.message_content = True  # Needed to send messages in channels
+# Replace with your server (guild) ID for instant command registration
+GUILD_ID = 123456789012345678  # <-- put your Discord server ID here
+
+intents = discord.Intents.default()  # Default intents are enough for slash commands
 
 class APBot(discord.Client):
     def __init__(self):
         super().__init__(intents=intents)
         self.tree = app_commands.CommandTree(self)
         self.timers = {}  # {user_id: (end_timestamp, channel)}
-        self.bg_task_started = False  # prevent starting before ready
+        self.bg_task_started = False
 
     async def setup_hook(self):
-        await self.tree.sync()
-        print("Slash commands synced.")
+        # Sync commands to a specific guild for instant registration
+        guild = discord.Object(id=GUILD_ID)
+        await self.tree.sync(guild=guild)
+        print(f"Slash commands synced to guild {GUILD_ID}")
 
     async def on_ready(self):
         print(f"Logged in as {self.user}")
@@ -32,7 +37,7 @@ class APBot(discord.Client):
         to_remove = []
         for user_id, (end_timestamp, channel) in self.timers.items():
             if now >= end_timestamp:
-                if channel:  # make sure channel exists
+                if channel:
                     await channel.send(f"<@{user_id}> Your AP is now full!")
                 to_remove.append(user_id)
         for user_id in to_remove:
@@ -40,6 +45,7 @@ class APBot(discord.Client):
 
 bot = APBot()
 
+# Helper to calculate AP time
 def calculate_timer(value: int):
     if value < 0 or value > 140:
         return None, "Value must be between 0–140"
@@ -56,12 +62,13 @@ def calculate_timer(value: int):
         f"You will be maxed at: <t:{timestamp}:F>"
     )
 
+# Slash command
 @bot.tree.command(name="ap", description="Calculate time until 140 based on AP")
 @app_commands.describe(value="AP value between 0–140")
 async def ap(interaction: discord.Interaction, value: int):
+    print(f"Command received: {interaction.user} -> {value}")
     timestamp, msg = calculate_timer(value)
     if timestamp:
-        # Save timer with the channel where command was run
         bot.timers[interaction.user.id] = (timestamp, interaction.channel)
     await interaction.response.send_message(msg)
 
